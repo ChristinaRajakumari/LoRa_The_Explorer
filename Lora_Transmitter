@@ -1,0 +1,64 @@
+#include <SPI.h>
+#include <LoRa.h>
+#include <TinyGPS++.h>
+#include <SoftwareSerial.h>
+
+// GPS Module pins
+#define GPS_RX 4  // GPS TX to Arduino Nano D4
+
+#define GPS_TX 3  // GPS RX to Arduino Nano D3
+
+// LoRa Module pins
+#define LORA_CS 10
+#define LORA_RST 9
+#define LORA_IRQ 2
+
+// Initialize GPS and LoRa
+SoftwareSerial gpsSerial(GPS_RX, GPS_TX);
+TinyGPSPlus gps;
+
+void setup() {
+  Serial.begin(9600);          // Serial monitor
+  gpsSerial.begin(9600);       // GPS module
+
+  // Initialize LoRa
+  SPI.begin();
+  LoRa.setPins(LORA_CS, LORA_RST, LORA_IRQ);
+
+  if (!LoRa.begin(433E6)) {    // Adjust frequency as needed (433 MHz for EU, 915 MHz for US)
+    Serial.println("⚠ LoRa initialization failed!");
+    while (1);
+  }
+  Serial.println("✅ LoRa ready!");
+}
+
+void loop() {
+  float latitude = 0.0;
+  float longitude = 0.0;
+
+  // Read GPS data
+  while (gpsSerial.available()) {
+    gps.encode(gpsSerial.read());
+    if (gps.location.isUpdated()) {
+      latitude = gps.location.lat();
+      longitude = gps.location.lng();
+
+      // Print GPS data to Serial Monitor
+      Serial.print("📍 Latitude: ");
+      Serial.print(latitude, 6);
+      Serial.print(" | Longitude: ");
+      Serial.println(longitude, 6);
+
+      // Transmit GPS data via LoRa
+      LoRa.beginPacket();
+      LoRa.print("Lat: ");
+      LoRa.print(latitude, 6);
+      LoRa.print(", Lon: ");
+      LoRa.print(longitude, 6);
+      LoRa.endPacket();
+
+      Serial.println("🚀 GPS location sent via LoRa!");
+      delay(5000);  // Wait for 5 seconds before next transmission
+    }
+  }
+}
